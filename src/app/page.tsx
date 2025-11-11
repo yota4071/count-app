@@ -8,23 +8,41 @@ import Image from "next/image";
 
 export default function HomePage() {
   const [name, setName] = useState("My Counter");
+  const [isReady, setIsReady] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const router = useRouter();
 
-  useEffect(() => { ensureAnon(); }, []);
+  useEffect(() => {
+    ensureAnon().then(() => setIsReady(true));
+  }, []);
 
   const createGroup = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    const gid = crypto.randomUUID().replace(/-/g, "").slice(0, 20); // 短いID
+    if (!isReady || isCreating) return;
 
-    await set(ref(db, `groups/${gid}`), {
-      name: name || "Counter",
-      count: 0,
-      createdBy: uid,
-      members: { [uid]: true }
-    });
+    setIsCreating(true);
+    try {
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        alert("認証に失敗しました。ページを再読み込みしてください。");
+        setIsCreating(false);
+        return;
+      }
 
-    router.push(`/g/${gid}`);
+      const gid = crypto.randomUUID().replace(/-/g, "").slice(0, 20); // 短いID
+
+      await set(ref(db, `groups/${gid}`), {
+        name: name || "Counter",
+        count: 0,
+        createdBy: uid,
+        members: { [uid]: true }
+      });
+
+      router.push(`/g/${gid}`);
+    } catch (error) {
+      console.error("Error creating group:", error);
+      alert("カウンターの作成に失敗しました。もう一度お試しください。");
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -77,13 +95,21 @@ export default function HomePage() {
         </div>
 
         {/* 作成ボタン */}
-        <button onClick={createGroup} style={styles.createButton}>
+        <button
+          onClick={createGroup}
+          style={{
+            ...styles.createButton,
+            opacity: !isReady || isCreating ? 0.5 : 1,
+            cursor: !isReady || isCreating ? 'not-allowed' : 'pointer'
+          }}
+          disabled={!isReady || isCreating}
+        >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="16"></line>
             <line x1="8" y1="12" x2="16" y2="12"></line>
           </svg>
-          カウンターを作成
+          {isCreating ? "作成中..." : !isReady ? "準備中..." : "カウンターを作成"}
         </button>
 
         {/* 機能説明 */}
