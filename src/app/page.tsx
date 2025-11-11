@@ -13,7 +13,15 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    ensureAnon().then(() => setIsReady(true));
+    ensureAnon()
+      .then(() => {
+        console.log("認証成功:", auth.currentUser?.uid);
+        setIsReady(true);
+      })
+      .catch((error) => {
+        console.error("認証エラー:", error);
+        alert("認証に失敗しました: " + error.message);
+      });
   }, []);
 
   const createGroup = async () => {
@@ -22,6 +30,8 @@ export default function HomePage() {
     setIsCreating(true);
     try {
       const uid = auth.currentUser?.uid;
+      console.log("Creating group with UID:", uid);
+
       if (!uid) {
         alert("認証に失敗しました。ページを再読み込みしてください。");
         setIsCreating(false);
@@ -29,18 +39,25 @@ export default function HomePage() {
       }
 
       const gid = crypto.randomUUID().replace(/-/g, "").slice(0, 20); // 短いID
+      console.log("Generated group ID:", gid);
 
-      await set(ref(db, `groups/${gid}`), {
+      const groupData = {
         name: name || "Counter",
         count: 0,
         createdBy: uid,
         members: { [uid]: true }
-      });
+      };
+      console.log("Writing group data:", groupData);
+
+      await set(ref(db, `groups/${gid}`), groupData);
+      console.log("Group created successfully!");
 
       router.push(`/g/${gid}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating group:", error);
-      alert("カウンターの作成に失敗しました。もう一度お試しください。");
+      console.error("Error code:", error.code);
+      console.error("Error message:", error.message);
+      alert(`カウンターの作成に失敗しました:\n${error.message}\n\nコードを確認: ${error.code || 'unknown'}`);
       setIsCreating(false);
     }
   };
