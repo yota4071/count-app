@@ -10,15 +10,23 @@ export default function HomePage() {
   const [name, setName] = useState("My Counter");
   const [isReady, setIsReady] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const router = useRouter();
 
+  const addDebug = (msg: string) => {
+    console.log(msg);
+    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
+  };
+
   useEffect(() => {
+    addDebug("認証を開始しています...");
     ensureAnon()
       .then(() => {
-        console.log("認証成功:", auth.currentUser?.uid);
+        addDebug(`認証成功: ${auth.currentUser?.uid}`);
         setIsReady(true);
       })
       .catch((error) => {
+        addDebug(`認証エラー: ${error.message}`);
         console.error("認証エラー:", error);
         alert("認証に失敗しました: " + error.message);
       });
@@ -28,18 +36,21 @@ export default function HomePage() {
     if (!isReady || isCreating) return;
 
     setIsCreating(true);
+    addDebug("カウンター作成を開始...");
+
     try {
       const uid = auth.currentUser?.uid;
-      console.log("Creating group with UID:", uid);
+      addDebug(`UID: ${uid}`);
 
       if (!uid) {
+        addDebug("エラー: UIDが取得できませんでした");
         alert("認証に失敗しました。ページを再読み込みしてください。");
         setIsCreating(false);
         return;
       }
 
-      const gid = crypto.randomUUID().replace(/-/g, "").slice(0, 20); // 短いID
-      console.log("Generated group ID:", gid);
+      const gid = crypto.randomUUID().replace(/-/g, "").slice(0, 20);
+      addDebug(`生成されたグループID: ${gid}`);
 
       const groupData = {
         name: name || "Counter",
@@ -47,17 +58,16 @@ export default function HomePage() {
         createdBy: uid,
         members: { [uid]: true }
       };
-      console.log("Writing group data:", groupData);
+      addDebug("Firebaseに書き込み中...");
 
       await set(ref(db, `groups/${gid}`), groupData);
-      console.log("Group created successfully!");
+      addDebug("書き込み成功！リダイレクト中...");
 
       router.push(`/g/${gid}`);
     } catch (error: any) {
+      addDebug(`エラー発生: ${error.message} (コード: ${error.code})`);
       console.error("Error creating group:", error);
-      console.error("Error code:", error.code);
-      console.error("Error message:", error.message);
-      alert(`カウンターの作成に失敗しました:\n${error.message}\n\nコードを確認: ${error.code || 'unknown'}`);
+      alert(`カウンターの作成に失敗しました:\n${error.message}\n\nコード: ${error.code || 'unknown'}`);
       setIsCreating(false);
     }
   };
@@ -191,6 +201,16 @@ export default function HomePage() {
           <p style={styles.featureImageCaption}>リアルタイム同期</p>
         </div>
       </div>
+
+      {/* デバッグ情報 (開発用) */}
+      {debugInfo.length > 0 && (
+        <div style={styles.debugPanel}>
+          <h3 style={styles.debugTitle}>デバッグ情報</h3>
+          {debugInfo.map((info, idx) => (
+            <div key={idx} style={styles.debugLine}>{info}</div>
+          ))}
+        </div>
+      )}
     </div>
     </main>
   );
@@ -346,5 +366,32 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "14px",
     fontWeight: 600,
     color: "#1f2937",
+  },
+  debugPanel: {
+    marginTop: "24px",
+    background: "rgba(255, 255, 255, 0.95)",
+    backdropFilter: "blur(10px)",
+    borderRadius: "16px",
+    padding: "16px",
+    maxWidth: "600px",
+    width: "100%",
+    boxShadow: "0 10px 40px rgba(0, 0, 0, 0.2)",
+    maxHeight: "300px",
+    overflowY: "auto",
+  },
+  debugTitle: {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#1f2937",
+    marginBottom: "12px",
+    borderBottom: "2px solid #667eea",
+    paddingBottom: "8px",
+  },
+  debugLine: {
+    fontSize: "12px",
+    color: "#4b5563",
+    fontFamily: "monospace",
+    padding: "4px 0",
+    borderBottom: "1px solid #e5e7eb",
   },
 };
